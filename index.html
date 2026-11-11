@@ -921,7 +921,7 @@ document.addEventListener('click',e=>{
     case'tochip':{const t=S.tray.find(x=>x.id===id),v=el.dataset.to;t.to=t.to.includes(v)?t.to.filter(x=>x!==v):t.to.concat(v);save();break}
     case'place':if(placeTray(id)){save();say('Placed')}break;
     case'placeall':{let n=0;for(const t of S.tray.slice())if(t.to.length&&placeTray(t.id))n++;save();say(`${n} placed`);break}
-    case'syncsave':{const r=($('#syRepo').value||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),tk=($('#syTok').value||'').trim();
+    case'syncsave':{const r=($('#syRepo').value||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),tk=cleanTok($('#syTok').value);
       if(!/^[\w.-]+\/[\w.-]+$/.test(r)||tk.length<20){say('Enter the repository as owner/name and paste the token');break}
       SY={repo:r,token:tk};saveSY();render();say('Connecting…');syncNow(true);break}
     case'syncnow':syncNow(true);break;
@@ -998,6 +998,8 @@ $('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
 /* ================= sync: a private GitHub repo holds one data file ================= */
 const SK='bloom.sync';
 let SY={};try{SY=JSON.parse(localStorage.getItem(SK)||'{}')}catch(e){}
+const cleanTok=t=>String(t||'').replace(/[^A-Za-z0-9_]/g,'');   /* tokens only contain letters, digits and _ — drops stray spaces, dots, quotes */
+if(SY.token){const c=cleanTok(SY.token);if(c!==SY.token){SY.token=c;SY.err='';try{localStorage.setItem(SK,JSON.stringify(SY))}catch(e){}}}
 const saveSY=()=>{try{localStorage.setItem(SK,JSON.stringify(SY))}catch(e){}};
 let syncT=null,syncing=false,syncAgain=false,showLink=false;
 const setupLink=()=>location.origin+location.pathname.replace(/index\.html$/,'')+'#sync='+encodeURIComponent(SY.repo+'|'+SY.token);
@@ -1075,7 +1077,7 @@ setInterval(()=>{if(!document.hidden)syncNow()},60000);
 
 /* ================= boot ================= */
 if(location.hash.startsWith('#sync=')){
-  try{const[r,tk]=decodeURIComponent(location.hash.slice(6)).split('|');if(r&&tk){SY={repo:r.trim(),token:tk.trim()};saveSY();say('Sync connected on this device')}}catch(e){}
+  try{const[r,tk]=decodeURIComponent(location.hash.slice(6)).split('|');if(r&&tk){SY={repo:r.trim(),token:cleanTok(tk)};saveSY();say('Sync connected on this device')}}catch(e){}
   history.replaceState(null,'',location.pathname+location.search);
 }
 setTimeout(()=>syncNow(),600);
