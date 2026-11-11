@@ -793,7 +793,7 @@ function settingsSheet(){
   const n='Notification' in window?Notification.permission:'unsupported';
   return `<div class="sh"><h2 style="flex:1;font-size:1.6rem">Settings</h2>${closeBtn}</div>
   <div class="box"><h4>Reminders</h4><p class="sm mut" style="margin:0 0 10px">Deadlines, events and reminder times pop up while Bloom is open. ${n==='granted'?'Browser notifications are on.':n==='unsupported'?'This browser has no notifications.':'You can also turn on notifications.'}</p>${n==='default'?`<button class="btn sm" data-act="bell">Allow notifications</button>`:''}</div>
-  <div class="box"><h4>Sync between devices</h4>${syncOn()?`<p class="sm mut" style="margin:0 0 10px">Connected to <b>${esc(SY.repo)}</b> · <span id="syncStatus2">${esc(syncText())}</span></p><div class="btns" style="margin:0"><button class="btn sm" data-act="syncnow">Sync now</button><button class="btn sm ghost" data-act="synccopy">Copy phone setup link</button><button class="btn sm warn" data-act="syncoff">Disconnect</button></div>`
+  <div class="box"><h4>Sync between devices</h4>${syncOn()?`<p class="sm mut" style="margin:0 0 10px">Connected to <b>${esc(SY.repo)}</b> · <span id="syncStatus2">${esc(syncText())}</span></p><div class="btns" style="margin:0"><button class="btn sm" data-act="syncnow">Sync now</button><button class="btn sm ghost" data-act="synccopy">Show phone setup link</button><button class="btn sm warn" data-act="syncoff">Disconnect</button></div>${showLink?`<div style="margin-top:12px"><p class="sm mut" style="margin:0 0 6px">Send this link to your phone privately (AirDrop or a message to yourself) and open it in Safari. It contains your access token, so don’t share it with anyone else.</p><input id="setupLink" readonly value="${esc(setupLink())}" onfocus="this.select()" style="font-size:.78rem"><div class="btns" style="margin-top:8px"><button class="btn sm ghost" data-act="synchide">Hide link</button></div></div>`:''}`
     :`<p class="sm mut" style="margin:0 0 10px">Keeps your laptop and phone identical through a private GitHub repository only you can open. Create a private repo, then a fine-grained access token limited to that repo with “Contents: read and write”.</p><label class="cap">Repository (owner/name)</label><input id="syRepo" placeholder="yourname/bloom-data" autocapitalize="off" autocorrect="off"><div style="height:8px"></div><label class="cap">Access token</label><input id="syTok" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off"><div class="btns" style="margin-top:12px"><button class="btn sm" data-act="syncsave">Connect & sync</button></div>`}</div>
   <div class="box"><h4>Voice language</h4><input id="lang" value="${esc(S.lang||'')}" placeholder="e.g. en-US, pl-PL"></div>
   <div class="box"><h4>Money</h4><button class="btn sm ghost" data-act="allowance">Monthly allowance${S.allowance?': '+money(S.allowance):''}</button></div>
@@ -857,7 +857,7 @@ function closeSheet(){
   if(sh){ if(sh.type==='item'){const i=item(sh.id);if(i&&i.draft){S.items=S.items.filter(x=>x!==i)}}
     if(sh.type==='event'){const e=evt(sh.id);if(e&&e.draft){S.events=S.events.filter(x=>x!==e)}}
     if(sh.type==='item'||sh.type==='event'){const o=sh.type==='item'?item(sh.id):evt(sh.id);if(!o)say('Nothing saved — add a title first')}}
-  S.ui.sheet=null;save();
+  S.ui.sheet=null;showLink=false;save();
 }
 
 /* ================= events ================= */
@@ -926,8 +926,11 @@ document.addEventListener('click',e=>{
       SY={repo:r,token:tk};saveSY();render();say('Connecting…');syncNow(true);break}
     case'syncnow':syncNow(true);break;
     case'syncoff':if(confirm('Disconnect sync on this device? Your data stays here.')){SY={};saveSY();render()}break;
-    case'synccopy':{const link=location.origin+location.pathname+'#sync='+encodeURIComponent(SY.repo+'|'+SY.token);
-      (navigator.clipboard?navigator.clipboard.writeText(link):Promise.reject()).then(()=>say('Setup link copied — open it on your phone')).catch(()=>prompt('Copy this setup link and open it on your phone:',link));break}
+    case'synccopy':{showLink=true;const link=setupLink();render();
+      const f=$('#setupLink');if(f){f.focus();f.select();try{f.setSelectionRange(0,99999)}catch(e){}}
+      if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(link).then(()=>say('Link copied — send it to your phone')).catch(()=>say('Tap the link in the box, then choose Copy'));
+      else say('Tap the link in the box, then choose Copy');break}
+    case'synchide':showLink=false;render();break;
     case'newtask':{const it=newItem({title:'',draft:true});S.items.push(it);S.ui.sheet={type:'item',id:it.id};render();break}
     case'newevent':{const ev=newEvent({date:ds||S.ui.sel||todayStr(),draft:true});S.events.push(ev);S.ui.sheet={type:'event',id:ev.id};render();break}
     case'calv':S.ui.cal=id;if(id==='day'||id==='week')S.ui.date=S.ui.sel||S.ui.date;save();break;
@@ -996,7 +999,8 @@ $('#file').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;
 const SK='bloom.sync';
 let SY={};try{SY=JSON.parse(localStorage.getItem(SK)||'{}')}catch(e){}
 const saveSY=()=>{try{localStorage.setItem(SK,JSON.stringify(SY))}catch(e){}};
-let syncT=null,syncing=false,syncAgain=false;
+let syncT=null,syncing=false,syncAgain=false,showLink=false;
+const setupLink=()=>location.origin+location.pathname.replace(/index\.html$/,'')+'#sync='+encodeURIComponent(SY.repo+'|'+SY.token);
 const syncOn=()=>!!(SY.token&&SY.repo);
 function scheduleSync(){if(!syncOn())return;clearTimeout(syncT);syncT=setTimeout(()=>syncNow(),2500)}
 const b64e=s=>btoa(unescape(encodeURIComponent(s)));
