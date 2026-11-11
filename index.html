@@ -793,7 +793,7 @@ function settingsSheet(){
   const n='Notification' in window?Notification.permission:'unsupported';
   return `<div class="sh"><h2 style="flex:1;font-size:1.6rem">Settings</h2>${closeBtn}</div>
   <div class="box"><h4>Reminders</h4><p class="sm mut" style="margin:0 0 10px">Deadlines, events and reminder times pop up while Bloom is open. ${n==='granted'?'Browser notifications are on.':n==='unsupported'?'This browser has no notifications.':'You can also turn on notifications.'}</p>${n==='default'?`<button class="btn sm" data-act="bell">Allow notifications</button>`:''}</div>
-  <div class="box"><h4>Sync between devices</h4>${syncOn()?`<p class="sm mut" style="margin:0 0 10px">Connected to <b>${esc(SY.repo)}</b> · <span id="syncStatus2">${esc(syncText())}</span></p><div class="btns" style="margin:0"><button class="btn sm" data-act="syncnow">Sync now</button><button class="btn sm ghost" data-act="synccopy">Show phone setup link</button><button class="btn sm warn" data-act="syncoff">Disconnect</button></div>${showLink?`<div style="margin-top:12px"><p class="sm mut" style="margin:0 0 6px">Send this link to your phone privately (AirDrop or a message to yourself) and open it in Safari. It contains your access token, so don’t share it with anyone else.</p><input id="setupLink" readonly value="${esc(setupLink())}" onfocus="this.select()" style="font-size:.78rem"><div class="btns" style="margin-top:8px"><button class="btn sm ghost" data-act="synchide">Hide link</button></div></div>`:''}`
+  <div class="box"><h4>Sync between devices</h4>${syncOn()?`<p class="sm mut" style="margin:0 0 10px">Connected to <b>${esc(SY.repo)}</b> · <span id="syncStatus2">${esc(syncText())}</span><br>Token ending …${esc(SY.token.slice(-4))} · ${SY.token.length} characters (should match on both devices)</p><div class="btns" style="margin:0"><button class="btn sm" data-act="syncnow">Sync now</button><button class="btn sm ghost" data-act="synccopy">Show phone setup link</button><button class="btn sm warn" data-act="syncoff">Disconnect</button></div>${showLink?`<div style="margin-top:12px"><p class="sm mut" style="margin:0 0 6px">Send this link to your phone privately (AirDrop or a message to yourself) and open it in Safari. It contains your access token, so don’t share it with anyone else.</p><input id="setupLink" readonly value="${esc(setupLink())}" onfocus="this.select()" style="font-size:.78rem"><div class="btns" style="margin-top:8px"><button class="btn sm ghost" data-act="synchide">Hide link</button></div></div>`:''}`
     :`<p class="sm mut" style="margin:0 0 10px">Keeps your laptop and phone identical through a private GitHub repository only you can open. Create a private repo, then a fine-grained access token limited to that repo with “Contents: read and write”.</p><label class="cap">Repository (owner/name)</label><input id="syRepo" placeholder="yourname/bloom-data" autocapitalize="off" autocorrect="off"><div style="height:8px"></div><label class="cap">Access token</label><input id="syTok" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off"><div class="btns" style="margin-top:12px"><button class="btn sm" data-act="syncsave">Connect & sync</button></div>`}</div>
   <div class="box"><h4>Voice language</h4><input id="lang" value="${esc(S.lang||'')}" placeholder="e.g. en-US, pl-PL"></div>
   <div class="box"><h4>Money</h4><button class="btn sm ghost" data-act="allowance">Monthly allowance${S.allowance?': '+money(S.allowance):''}</button></div>
@@ -1050,8 +1050,8 @@ async function syncNow(manual){
       const r=await ghApi('/contents/bloom.json?cb='+Date.now());
       let remote=null,sha=null;
       if(r.status===200){const j=await r.json();sha=j.sha;remote=JSON.parse(b64d(j.content))}
-      else if(r.status===404){const rr=await ghApi('');if(rr.status===404)throw new Error('Repository not found — check the name and token access');if(rr.status===401)throw new Error('Token rejected')}
-      else throw new Error(r.status===401?'Token rejected':r.status===403?'Token lacks access':'GitHub '+r.status);
+      else if(r.status===404){const rr=await ghApi('');if(rr.status===404)throw new Error('Repository not found — check the name and token access');if(rr.status===401)throw new Error('Token rejected — it may have expired, been revoked or been copied incompletely')}
+      else throw new Error(r.status===401?'Token rejected — it may have expired, been revoked or been copied incompletely':r.status===403?'Token lacks access':'GitHub '+r.status);
       stamp();const local=payload();
       const merged=remote?mergeP(local,remote):local;
       if(remote&&canon(merged)!==canon(local)){applyMerged(merged);changedLocal=true}
@@ -1075,7 +1075,7 @@ setInterval(()=>{if(!document.hidden)syncNow()},60000);
 
 /* ================= boot ================= */
 if(location.hash.startsWith('#sync=')){
-  try{const[r,tk]=decodeURIComponent(location.hash.slice(6)).split('|');if(r&&tk){SY={repo:r,token:tk};saveSY();say('Sync connected on this device')}}catch(e){}
+  try{const[r,tk]=decodeURIComponent(location.hash.slice(6)).split('|');if(r&&tk){SY={repo:r.trim(),token:tk.trim()};saveSY();say('Sync connected on this device')}}catch(e){}
   history.replaceState(null,'',location.pathname+location.search);
 }
 setTimeout(()=>syncNow(),600);
